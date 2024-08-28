@@ -1,1 +1,1 @@
-"# Command-Control" 
+# Command & Control Server
