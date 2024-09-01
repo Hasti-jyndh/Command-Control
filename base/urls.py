@@ -1,13 +1,18 @@
-from django.urls import path
-from .views import *
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import AgentViewSet, CommandViewSet, ExecutedCommandViewSet, FileTransferViewSet
 
+# Initialize the router
+router = DefaultRouter()
+
+# Register the viewsets with the router
+router.register(r'agents', AgentViewSet, basename='agent')
+router.register(r'commands', CommandViewSet, basename='command')
+router.register(r'executed_commands', ExecutedCommandViewSet, basename='executedcommand')
+router.register(r'file_transfers', FileTransferViewSet, basename='filetransfer')
+
+# Define the URL patterns
 urlpatterns = [
-    path('',home,name='home'),
-    path('agents/',agents,name='agents'),
-    path('register/',register_agent, name='register_agent'),
-    path('command/<str:agent_id>/', get_command, name='get_command'),
-    path('report/<str:agent_id>/', report_result, name='report_result'),
-    path('file/<uuid:agent_id>/<str:file_name>/', file_transfer, name='download_file'),
-    path('file/<uuid:agent_id>/', file_transfer, name='upload_file'),
+    path('', include(router.urls)),  # Include all router-generated URLs
+    path('agents/<int:agent_id>/', include(router.urls)),
 ]
-

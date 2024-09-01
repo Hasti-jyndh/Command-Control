@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Agent, Command, FileTransfer
-from .serializers import AgentSerializer, CommandSerializer, FileTransferSerializer
+from .models import Agent, Command, ExecutedCommand, FileTransfer
+from .serializers import AgentSerializer, CommandSerializer, ExecutedCommandSerializer, FileTransferSerializer
 
 
 class AgentViewSet(viewsets.ModelViewSet):
@@ -42,6 +42,29 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         files = agent.file_transfers.filter(direction='download', status='pending')
         return Response(FileTransferSerializer(files, many=True).data)
+
+
+class CommandViewSet(viewsets.ModelViewSet):
+    queryset = Command.objects.all()
+    serializer_class = CommandSerializer
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        # Check if the command was executed and move it to ExecutedCommand
+        if response.data['executed']:
+            command = self.get_object()
+            ExecutedCommand.objects.create(
+                agent=command.agent,
+                command_text=command.command_text,
+                output=command.output
+            )
+            command.delete()  # Remove the original command
+        return response
+
+
+class ExecutedCommandViewSet(viewsets.ModelViewSet):
+    queryset = ExecutedCommand.objects.all()
+    serializer_class = ExecutedCommandSerializer
 
 
 class FileTransferViewSet(viewsets.ModelViewSet):

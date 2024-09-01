@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Agent, Command, FileTransfer
+from .models import *
 
 class AgentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,3 +15,8 @@ class FileTransferSerializer(serializers.ModelSerializer):
     class Meta:
         model = FileTransfer
         fields = ['id', 'agent', 'file', 'file_name', 'direction', 'status', 'timestamp']
+
+class ExecutedCommandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExecutedCommand
+        fields = ['id', 'agent', 'command_text', 'output', 'timestamp']
