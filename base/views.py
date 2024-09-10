@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import Agent, Command, ExecutedCommand, FileTransfer
 from .serializers import AgentSerializer, CommandSerializer, ExecutedCommandSerializer, FileTransferSerializer
+from django.utils import timezone
+from datetime import timedelta
 
 
 class AgentViewSet(viewsets.ModelViewSet):
@@ -43,6 +45,15 @@ class AgentViewSet(viewsets.ModelViewSet):
         files = agent.file_transfers.filter(direction='download', status='pending')
         return Response(FileTransferSerializer(files, many=True).data)
 
+    # offline agent handling
+    @action(detail=True, methods=['post'])
+    def check_in(self, request, pk=None):
+        agent = self.get_object()
+        agent.last_check_in = timezone.now()
+        agent.is_online = True
+        agent.save()
+        return Response({"status": "Agent checked in"}, status=status.HTTP_200_OK)
+
 
 class CommandViewSet(viewsets.ModelViewSet):
     queryset = Command.objects.all()
@@ -80,3 +91,9 @@ class FileTransferViewSet(viewsets.ModelViewSet):
         file_transfer = FileTransfer.objects.create(agent=agent, direction=direction, file=file, file_name=file.name)
 
         return Response(FileTransferSerializer(file_transfer).data, status=status.HTTP_201_CREATED)
+
+
+def mark_agents_as_offline(self):
+    agent = self.get_object()
+    threshold_time = timezone.now() - timedelta(minutes=5)
+    agent.objects.filter(last_check_in__lt=threshold_time).update(is_online=False)
