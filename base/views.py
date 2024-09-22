@@ -11,6 +11,27 @@ class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.all()
     serializer_class = AgentSerializer
 
+    def create(self, request, *args, **kwargs):
+        agent_uuid = request.data.get('uuid')
+        agent_name = request.data.get('name')
+        agent_ip = request.data.get('ip_address')
+        existing_agent = Agent.objects.filter(name=agent_name, ip_address=agent_ip).first()
+        if existing_agent:
+            return Response({
+                'id': existing_agent.id,
+                'message': 'Agent reconnected to the existing registration.'
+            }, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
+    @action(detail=True, methods=['patch'])
+    def update_command(self, request, pk=None):
+        agent = self.get_object()
+        timestamp = request.data.get('timestamp')
+        if timestamp:
+            agent.last_seen = timezone.datetime.fromtimestamp(float(timestamp))
+            agent.save()
+        # Handle other command update logic here
+        return Response({"status": "Command updated"}, status=status.HTTP_200_OK)
     @action(detail=True, methods=['post'])
     def add_command(self, request, pk=None):
         agent = self.get_object()
@@ -23,6 +44,16 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         commands = agent.commands.all()
         return Response(CommandSerializer(commands, many=True).data)
+
+    @action(detail=True, methods=['patch'])
+    def update_last_seen(self, request, pk=None):
+        agent = self.get_object()
+        timestamp = request.data.get('timestamp')
+        if timestamp:
+            agent.last_seen = timezone.datetime.fromtimestamp(float(timestamp))
+            agent.save()
+            return Response({"status": "Agent last_seen updated"}, status=status.HTTP_200_OK)
+        return Response({"error": "Timestamp not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def assign_file(self, request, pk=None):
@@ -72,10 +103,94 @@ class CommandViewSet(viewsets.ModelViewSet):
             command.delete()  # Remove the original command
         return response
 
+    @action(detail=True, methods=['patch'])
+    def update_last_seen(self, request, pk=None):
+        agent = self.get_object()
+        timestamp = request.data.get('timestamp')
+        if timestamp:
+            agent.last_seen = timezone.datetime.fromtimestamp(float(timestamp))
+            agent.save()
+            return Response({"status": "Agent last_seen updated"}, status=status.HTTP_200_OK)
+        return Response({"error": "Timestamp not provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        agent = self.get_object()
+        agent.is_paused = True
+        agent.save()
+        return Response({"status": "Agent paused"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def unpause(self, request, pk=None):
+        agent = self.get_object()
+        agent.is_paused = False
+        agent.save()
+        return Response({"status": "Agent unpaused"}, status=status.HTTP_200_OK)
+
 
 class ExecutedCommandViewSet(viewsets.ModelViewSet):
     queryset = ExecutedCommand.objects.all()
     serializer_class = ExecutedCommandSerializer
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+
+        # Check if the command was executed
+        if response.data.get('executed'):
+            command = self.get_object()
+
+            # Update agent's last seen
+            command.agent.last_seen = timezone.now()
+            command.agent.save()
+
+            # Move the command to ExecutedCommand model
+            executed_command = ExecutedCommand.objects.create(
+                agent=command.agent,
+                command_text=command.command_text,
+                output=command.output,
+                timestamp=timezone.now()  # or use command's timestamp
+            )
+
+            # Delete the original command
+            command.delete()
+
+            # Return success response
+            return Response({
+                "status": "Command executed and agent last_seen updated",
+                "executed_command": ExecutedCommandSerializer(executed_command).data
+            }, status=status.HTTP_200_OK)
+
+        return response
+
+    # Alternatively, create a specific action to update the executed status and agent last_seen
+    @action(detail=True, methods=['patch'])
+    def set_command_executed(self, request, pk=None):
+        command = self.get_object()
+
+        # Mark command as executed
+        command.executed = True
+        command.output = request.data.get('output', '')  # Optionally get output from the request
+        command.save()
+
+        # Update agent's last_seen to the current time
+        command.agent.last_seen = timezone.now()
+        command.agent.save()
+
+        # Move the command to ExecutedCommand model
+        executed_command = ExecutedCommand.objects.create(
+            agent=command.agent,
+            command_text=command.command_text,
+            output=command.output,
+            timestamp=timezone.now()
+        )
+
+        # Delete the original command after moving it
+        command.delete()
+
+        return Response({
+            "status": "Command executed and agent last_seen updated",
+            "executed_command": ExecutedCommandSerializer(executed_command).data
+        }, status=status.HTTP_200_OK)
 
 
 class FileTransferViewSet(viewsets.ModelViewSet):

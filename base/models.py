@@ -6,7 +6,8 @@ class Agent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
     ip_address = models.GenericIPAddressField()
-    last_seen = models.DateTimeField(auto_now=True)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    is_paused = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
