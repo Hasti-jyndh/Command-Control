@@ -19,4 +19,4 @@ class FileTransferSerializer(serializers.ModelSerializer):
 class ExecutedCommandSerializer(serializers.ModelSerializer):
     class Meta:
         model = ExecutedCommand
-        fields = ['id', 'agent', 'command_text', 'output', 'timestamp']
+        fields = ['id', 'agent', 'command_text', 'output', 'executed_at']

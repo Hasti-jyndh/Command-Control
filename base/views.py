@@ -37,6 +37,8 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         command_text = request.data.get('command_text')
         command = Command.objects.create(agent=agent, command_text=command_text)
+        agent.last_seen = timezone.now()
+        agent.save(update_fields=['last_seen'])
         return Response(CommandSerializer(command).data)
 
     @action(detail=True, methods=['get'])
@@ -100,7 +102,14 @@ class CommandViewSet(viewsets.ModelViewSet):
                 command_text=command.command_text,
                 output=command.output
             )
+            #agent = self.get_object()
+            agent = Agent.objects.get(id=kwargs.get('agent_id'))
+            agent.last_seen = timezone.datetime.now()
+            command.executed = True
+            agent.save()
+            command.save()
             command.delete()  # Remove the original command
+
         return response
 
     @action(detail=True, methods=['patch'])
@@ -144,12 +153,12 @@ class ExecutedCommandViewSet(viewsets.ModelViewSet):
             command.agent.save()
 
             # Move the command to ExecutedCommand model
-            executed_command = ExecutedCommand.objects.create(
-                agent=command.agent,
-                command_text=command.command_text,
-                output=command.output,
-                timestamp=timezone.now()  # or use command's timestamp
-            )
+            # executed_command = ExecutedCommand.objects.create(
+            #     agent=command.agent,
+            #     command_text=command.command_text,
+            #     output=command.output,
+            #     timestamp=timezone.now()  # or use command's timestamp
+            # )
 
             # Delete the original command
             command.delete()
@@ -204,7 +213,8 @@ class FileTransferViewSet(viewsets.ModelViewSet):
 
         agent = Agent.objects.get(pk=agent_id)
         file_transfer = FileTransfer.objects.create(agent=agent, direction=direction, file=file, file_name=file.name)
-
+        agent.last_seen = timezone.now()
+        agent.save(update_fields=['last_seen'])
         return Response(FileTransferSerializer(file_transfer).data, status=status.HTTP_201_CREATED)
 
 

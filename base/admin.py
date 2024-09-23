@@ -11,7 +11,7 @@ class CommandInline(admin.TabularInline):
 class ExecutedCommandInline(admin.TabularInline):
     model = ExecutedCommand
     extra = 1
-    readonly_fields = ('command_text', 'output', 'timestamp')
+    readonly_fields = ('command_text', 'output', 'executed_at')
 
 
 class FileTransferInline(admin.TabularInline):
@@ -37,9 +37,9 @@ class CommandAdmin(admin.ModelAdmin):
 
 @admin.register(ExecutedCommand)
 class ExecutedCommandAdmin(admin.ModelAdmin):
-    list_display = ('agent', 'command_text', 'timestamp')
+    list_display = ('agent', 'command_text', 'executed_at')
     search_fields = ('command_text', 'agent__name')
-    readonly_fields = ('command_text', 'output', 'timestamp')
+    readonly_fields = ('command_text', 'output', 'executed_at')
 
 
 @admin.register(FileTransfer)

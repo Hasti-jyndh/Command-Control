@@ -27,11 +27,10 @@ class ExecutedCommand(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='executed_commands')
     command_text = models.TextField()
     output = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
     executed_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Executed Command for {self.agent.name} at {self.timestamp}"
+        return f"Executed Command for {self.agent.name} at {self.executed_at}"
 
 
 class FileTransfer(models.Model):
@@ -44,4 +43,4 @@ class FileTransfer(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"FileTransfer ({self.direction}) for {self.agent.name}"
+        return f"FileTransfer ({self.direction}) for {self.agent.name} at {self.timestamp}"
