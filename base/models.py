@@ -35,7 +35,7 @@ class ExecutedCommand(models.Model):
 
 class FileTransfer(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='file_transfers')
-    file = models.FileField(upload_to='uploads/')
+    file = models.FileField(null=True, blank=True)#upload_to='uploads/'
     file_name = models.CharField(max_length=255, blank=True)  # To store the original file name
     direction = models.CharField(max_length=10, choices=(('upload', 'Upload'), ('download', 'Download')))
     status = models.CharField(max_length=10, choices=(('pending', 'Pending'), ('completed', 'Completed')),

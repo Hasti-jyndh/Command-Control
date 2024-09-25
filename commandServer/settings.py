@@ -120,8 +120,8 @@ USE_TZ = True
 
 import os
 STATIC_URL = "static/"
-MEDIA_URL = '/uploads/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'uploads')
+MEDIA_URL = 'files/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'files')
 
 
 # Default primary key field type
