@@ -44,7 +44,7 @@ class ExecutedCommandAdmin(admin.ModelAdmin):
 
 @admin.register(FileTransfer)
 class FileTransferAdmin(admin.ModelAdmin):
-    list_display = ('agent', 'file_name', 'direction', 'status', 'timestamp')
+    list_display = ('agent', 'file_name', 'direction', 'status', 'timestamp','transferred')
     list_filter = ('direction', 'status')
     search_fields = ('file_name', 'agent__name')
     readonly_fields = ('timestamp',)

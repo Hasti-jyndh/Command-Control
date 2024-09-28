@@ -89,7 +89,6 @@ class AgentViewSet(viewsets.ModelViewSet):
             file_transfer = agent.file_transfers.filter(status='pending').first()
             if not file_transfer:
                 file_transfer = agent.file_transfers.create(status='pending')
-
             try:
                 decoded_chunk = base64.b64decode(chunk_data)  # Decode the base64 chunk into binary data
             except (TypeError, ValueError) as e:
@@ -100,6 +99,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
             if chunk_index + 1 == counter:
                 file_transfer.status = 'completed'
+                file_transfer.transferred = True
                 file_transfer.save()
 
             return Response({'message': 'Chunk uploaded successfully'}, status=status.HTTP_201_CREATED)
@@ -147,20 +147,6 @@ class CommandViewSet(viewsets.ModelViewSet):
             agent.save()
             return Response({"status": "Agent last_seen updated"}, status=status.HTTP_200_OK)
         return Response({"error": "Timestamp not provided"}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['post'])
-    def pause(self, request, pk=None):
-        agent = self.get_object()
-        agent.is_paused = True
-        agent.save()
-        return Response({"status": "Agent paused"}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'])
-    def unpause(self, request, pk=None):
-        agent = self.get_object()
-        agent.is_paused = False
-        agent.save()
-        return Response({"status": "Agent unpaused"}, status=status.HTTP_200_OK)
 
 
 class ExecutedCommandViewSet(viewsets.ModelViewSet):
@@ -219,7 +205,6 @@ class FileTransferViewSet(viewsets.ModelViewSet):
         agent_id = request.data.get('agent')
         direction = request.data.get('direction')
         file = request.FILES.get('file')
-
         agent = Agent.objects.get(pk=agent_id)
         file_transfer = FileTransfer.objects.create(agent=agent, direction=direction, file=file, file_name=file.name)
         agent.last_seen = timezone.now()

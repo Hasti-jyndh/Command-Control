@@ -41,6 +41,6 @@ class FileTransfer(models.Model):
     status = models.CharField(max_length=10, choices=(('pending', 'Pending'), ('completed', 'Completed')),
                               default='pending')
     timestamp = models.DateTimeField(auto_now_add=True)
-
+    transferred = models.BooleanField(default=False)
     def __str__(self):
         return f"FileTransfer ({self.direction}) for {self.agent.name} at {self.timestamp}"
