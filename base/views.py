@@ -1,3 +1,5 @@
+import pdb
+from os.path import getsize
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -71,13 +73,13 @@ class AgentViewSet(viewsets.ModelViewSet):
         )
         return Response(FileTransferSerializer(file_transfer).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['get','post'])
+    @action(detail=True, methods=['get','post','patch'])
     def pending_files(self, request, pk=None):
-        if request.method == "GET":
+        if request.method == "GET": # get list of files
             agent = self.get_object()
             files = agent.file_transfers.filter(status='pending')
             return Response(FileTransferSerializer(files, many=True).data)
-        elif request.method == "POST":
+        elif request.method == "POST": # upload
             agent = self.get_object()
             data = json.loads(request.body)
             counter = data.get('counter', 0)  # Total number of chunks
@@ -103,6 +105,40 @@ class AgentViewSet(viewsets.ModelViewSet):
                 file_transfer.save()
 
             return Response({'message': 'Chunk uploaded successfully'}, status=status.HTTP_201_CREATED)
+        elif request.method == "PATCH":
+            #import pdb
+            #pdb.set_trace()
+            agent = self.get_object()
+            data = json.loads(request.body)
+            file_id = data.get('file_id')
+            real_filename = data.get("realfilename")
+            real_file_size = data.get("realfilesize", 0)
+
+            # Validate the real file information
+            if not real_filename or real_file_size <= 0:
+                return Response({'error': 'Invalid file data'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Define the file path (ensure it matches the upload directory path)
+            file_path = f"files/{real_filename}"
+
+            # Compare the file size to confirm successful download
+            try:
+                size_on_server = getsize(file_path)
+            except FileNotFoundError:
+                return Response({'error': 'File not found on server'}, status=status.HTTP_404_NOT_FOUND)
+
+            if size_on_server == real_file_size:
+                file_transfer = agent.file_transfers.filter(id=file_id).first()
+                if file_transfer:
+                    file_transfer.status = 'completed'
+                    file_transfer.transferred = True
+                    file_transfer.save()
+                    return Response({'message': 'File download confirmed and marked as completed'},
+                                    status=status.HTTP_200_OK)
+                else:
+                    return Response({'error': 'File not found on server'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({'error': 'File size mismatch'}, status=status.HTTP_400_BAD_REQUEST)
 
     # offline agent handling
     @action(detail=True, methods=['post'])

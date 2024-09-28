@@ -1,5 +1,5 @@
 from django.db import models
-import uuid
+import uuid,os
 
 
 class Agent(models.Model):
@@ -44,3 +44,5 @@ class FileTransfer(models.Model):
     transferred = models.BooleanField(default=False)
     def __str__(self):
         return f"FileTransfer ({self.direction}) for {self.agent.name} at {self.timestamp}"
+    def filename(self):
+        return os.path.basename(self.file.name)
